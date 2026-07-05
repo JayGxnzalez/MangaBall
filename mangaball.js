@@ -112,9 +112,6 @@ async function extractChapters(url) {
             for (let j = 0; j < translations.length; j++) {
                 const t = translations[j];
                 if (!t || !t.url) continue;
-                if (i === 0 && j === 0) {
-                    console.log("[MangaBall] sample chapter url: " + t.url);
-                }
                 entries.push({
                     id: toAbsolute(t.url),
                     title: String(t.name || ("Chapter " + chapter.number)),
@@ -135,29 +132,19 @@ async function extractChapters(url) {
 
 async function extractImages(url) {
     try {
-        console.log("[MangaBall] extractImages url: " + url);
         const response = await fetch(url);
-        console.log("[MangaBall] extractImages status: " + response.status);
         const html = await response.text();
-        console.log("[MangaBall] extractImages html length: " + html.length);
 
         const match = /const chapterImages = JSON\.parse\(`([\s\S]*?)`\)/.exec(html);
-        if (!match) {
-            console.log("[MangaBall] chapterImages regex did NOT match");
-            const idx = html.indexOf("chapterImages");
-            console.log("[MangaBall] chapterImages substring: " + (idx >= 0 ? html.substring(idx, idx + 120) : "NOT FOUND in html"));
-            return [];
-        }
+        if (!match) return [];
 
         const images = JSON.parse(match[1]);
-        console.log("[MangaBall] extractImages count: " + images.length);
         const out = [];
         for (let i = 0; i < images.length; i++) {
             if (images[i]) out.push(String(images[i]).trim());
         }
         return out;
     } catch (err) {
-        console.log("[MangaBall] extractImages error: " + (err.message || err));
         return [];
     }
 }
