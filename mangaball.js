@@ -13,7 +13,11 @@ function extractTitleId(url) {
 
 function toAbsolute(u) {
     u = String(u || "").trim();
-    if (u && u.indexOf("http") !== 0) {
+    if (u.indexOf("//") === 0) {
+        u = "https:" + u;
+    } else if (u.indexOf("http://") === 0) {
+        u = "https://" + u.substring(7);
+    } else if (u.indexOf("https://") !== 0 && u.length > 0) {
         u = "https://mangaball.net" + (u.indexOf("/") === 0 ? "" : "/") + u;
     }
     return u;
