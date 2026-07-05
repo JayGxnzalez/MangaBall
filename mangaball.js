@@ -11,10 +11,17 @@ function extractTitleId(url) {
     return match ? match[1] : null;
 }
 
+function toAbsolute(u) {
+    u = String(u || "").trim();
+    if (u && u.indexOf("http") !== 0) {
+        u = "https://mangaball.net" + (u.indexOf("/") === 0 ? "" : "/") + u;
+    }
+    return u;
+}
+
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
-        console.log("[MangaBall] searchResults called with keyword: " + keyword);
         const csrfToken = await getCsrfToken();
         const postData = "search_input=" + encodeURIComponent(keyword);
 
@@ -29,32 +36,20 @@ async function searchResults(keyword, page = 1) {
             },
             body: postData
         });
-        console.log("[MangaBall] Search response status: " + response.status);
 
         const json = await response.json();
-        console.log("[MangaBall] Response code: " + json.code);
-
         const manga = json.data && Array.isArray(json.data.manga) ? json.data.manga : [];
         for (let i = 0; i < manga.length; i++) {
             const item = manga[i];
             if (!item || !item.url || !item.title) continue;
-
-            let url = String(item.url).trim();
-            if (url.indexOf("http") !== 0) {
-                url = "https://mangaball.net" + url;
-            }
-
             results.push({
-                id: url,
+                id: toAbsolute(item.url),
                 imageURL: String(item.img || "").trim(),
                 title: String(item.title).trim()
             });
         }
-
-        console.log("[MangaBall] Final results count: " + results.length);
         return results;
     } catch (err) {
-        console.log("[MangaBall] searchResults error: " + (err.message || err));
         return results;
     }
 }
@@ -113,8 +108,11 @@ async function extractChapters(url) {
             for (let j = 0; j < translations.length; j++) {
                 const t = translations[j];
                 if (!t || !t.url) continue;
+                if (i === 0 && j === 0) {
+                    console.log("[MangaBall] sample chapter url: " + t.url);
+                }
                 entries.push({
-                    id: String(t.url).trim(),
+                    id: toAbsolute(t.url),
                     title: String(t.name || ("Chapter " + chapter.number)),
                     chapter: parseFloat(chapter.number_float) || 0,
                     scanlation_group: String((t.group && t.group.name) ? t.group.name : "")
@@ -133,19 +131,29 @@ async function extractChapters(url) {
 
 async function extractImages(url) {
     try {
+        console.log("[MangaBall] extractImages url: " + url);
         const response = await fetch(url);
+        console.log("[MangaBall] extractImages status: " + response.status);
         const html = await response.text();
+        console.log("[MangaBall] extractImages html length: " + html.length);
 
-        const match = /const chapterImages = JSON\.parse\(`(\[.*?\])`\);/.exec(html);
-        if (!match) return [];
+        const match = /const chapterImages = JSON\.parse\(`([\s\S]*?)`\)/.exec(html);
+        if (!match) {
+            console.log("[MangaBall] chapterImages regex did NOT match");
+            const idx = html.indexOf("chapterImages");
+            console.log("[MangaBall] chapterImages substring: " + (idx >= 0 ? html.substring(idx, idx + 120) : "NOT FOUND in html"));
+            return [];
+        }
 
         const images = JSON.parse(match[1]);
+        console.log("[MangaBall] extractImages count: " + images.length);
         const out = [];
         for (let i = 0; i < images.length; i++) {
             if (images[i]) out.push(String(images[i]).trim());
         }
         return out;
     } catch (err) {
+        console.log("[MangaBall] extractImages error: " + (err.message || err));
         return [];
     }
 }
