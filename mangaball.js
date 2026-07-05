@@ -1,19 +1,5 @@
-async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
-    const headers = options.headers || {};
-    try {
-        return await fetchv2(url, headers, options.method || 'GET', options.body || null);
-    } catch (e) {
-        try {
-            return await fetch(url, options);
-        } catch (error) {
-            return null;
-        }
-    }
-}
-
 async function getCsrfToken() {
-    const response = await soraFetch("https://mangaball.net/");
-    if (!response) throw new Error("CSRF fetch failed - null response");
+    const response = await fetch("https://mangaball.net/");
     const html = await response.text();
     const match = /<meta name="csrf-token" content="([^"]+)">/.exec(html);
     if (!match) throw new Error("CSRF token not found");
@@ -28,41 +14,50 @@ function extractTitleId(url) {
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
+        console.log("[MangaBall] searchResults called with keyword: " + keyword);
         const csrfToken = await getCsrfToken();
-        const postData = "search_input=" + encodeURIComponent(keyword) + "&filters[sort]=updated_chapters_desc&filters[page]=" + page;
+        const postData = "search_input=" + encodeURIComponent(keyword);
 
-        const response = await soraFetch("https://mangaball.net/api/v1/title/search-advanced/", {
+        const response = await fetch("https://mangaball.net/api/v1/smart-search/search/", {
             method: "POST",
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "X-CSRF-TOKEN": csrfToken
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-CSRF-Token": csrfToken,
+                "X-Requested-With": "XMLHttpRequest",
+                "Origin": "https://mangaball.net",
+                "Referer": "https://mangaball.net/search-advanced/"
             },
             body: postData
         });
-
-        if (!response) return JSON.stringify(results);
+        console.log("[MangaBall] Search response status: " + response.status);
 
         const json = await response.json();
-        if (json.code === 200 && Array.isArray(json.data)) {
-            for (const item of json.data) {
-                results.push({
-                    id: item.url.trim(),
-                    imageURL: item.cover.trim(),
-                    title: item.name.trim()
-                });
+        console.log("[MangaBall] Response code: " + json.code);
+
+        const manga = json.data && Array.isArray(json.data.manga) ? json.data.manga : [];
+        for (const item of manga) {
+            let url = item.url.trim();
+            if (url.indexOf("http") !== 0) {
+                url = "https://mangaball.net" + url;
             }
+            results.push({
+                id: url,
+                imageURL: (item.img || "").trim(),
+                title: item.title.trim()
+            });
         }
 
+        console.log("[MangaBall] Final results count: " + results.length);
         return JSON.stringify(results);
     } catch (err) {
+        console.log("[MangaBall] searchResults error: " + (err.message || err));
         return JSON.stringify(results);
     }
 }
 
 async function extractDetails(url) {
     try {
-        const response = await soraFetch(url);
-        if (!response) return JSON.stringify({ description: "Error", tags: [] });
+        const response = await fetch(url);
         const html = await response.text();
 
         const descMatch = /<div class="description-text">[\s\S]*?<p>([\s\S]*?)<\/p>/.exec(html);
@@ -89,16 +84,18 @@ async function extractChapters(url) {
         const csrfToken = await getCsrfToken();
         const postData = "title_id=" + titleId + "&userSettingsEnabled=false";
 
-        const response = await soraFetch("https://mangaball.net/api/v1/chapter/chapter-listing-by-title-id/", {
+        const response = await fetch("https://mangaball.net/api/v1/chapter/chapter-listing-by-title-id/", {
             method: "POST",
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "X-CSRF-TOKEN": csrfToken
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-CSRF-Token": csrfToken,
+                "X-Requested-With": "XMLHttpRequest",
+                "Origin": "https://mangaball.net",
+                "Referer": "https://mangaball.net/"
             },
             body: postData
         });
 
-        if (!response) return JSON.stringify({ en: [] });
         const json = await response.json();
         if (json.code !== 200 || !Array.isArray(json.ALL_CHAPTERS)) {
             return JSON.stringify({ en: [] });
@@ -123,8 +120,7 @@ async function extractChapters(url) {
 
 async function extractImages(url) {
     try {
-        const response = await soraFetch(url);
-        if (!response) return JSON.stringify([]);
+        const response = await fetch(url);
         const html = await response.text();
 
         const match = /const chapterImages = JSON\.parse\(`(\[.*?\])`\);/.exec(html);
