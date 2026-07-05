@@ -13,19 +13,10 @@ async function soraFetch(url, options = { headers: {}, method: 'GET', body: null
 
 async function getCsrfToken() {
     const response = await soraFetch("https://mangaball.net/");
-    if (!response) {
-        console.log("[MangaBall] CSRF fetch returned null response");
-        throw new Error("CSRF fetch failed - null response");
-    }
-    console.log("[MangaBall] CSRF fetch status: " + response.status);
+    if (!response) throw new Error("CSRF fetch failed - null response");
     const html = await response.text();
-    console.log("[MangaBall] CSRF page length: " + html.length);
     const match = /<meta name="csrf-token" content="([^"]+)">/.exec(html);
-    if (!match) {
-        console.log("[MangaBall] CSRF token NOT found in HTML");
-        throw new Error("CSRF token not found");
-    }
-    console.log("[MangaBall] CSRF token found: " + match[1].substring(0, 10) + "...");
+    if (!match) throw new Error("CSRF token not found");
     return match[1];
 }
 
@@ -37,11 +28,8 @@ function extractTitleId(url) {
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
-        console.log("[MangaBall] searchResults called with keyword: " + keyword);
-
         const csrfToken = await getCsrfToken();
         const postData = "search_input=" + encodeURIComponent(keyword) + "&filters[sort]=updated_chapters_desc&filters[page]=" + page;
-        console.log("[MangaBall] POST body: " + postData);
 
         const response = await soraFetch("https://mangaball.net/api/v1/title/search-advanced/", {
             method: "POST",
@@ -52,26 +40,9 @@ async function searchResults(keyword, page = 1) {
             body: postData
         });
 
-        if (!response) {
-            console.log("[MangaBall] Search fetch returned null response");
-            return [];
-        }
-        console.log("[MangaBall] Search response status: " + response.status);
+        if (!response) return JSON.stringify(results);
 
-        const rawText = await response.text();
-        console.log("[MangaBall] Raw response length: " + rawText.length);
-        console.log("[MangaBall] Raw response (first 300 chars): " + rawText.substring(0, 300));
-
-        let json;
-        try {
-            json = JSON.parse(rawText);
-        } catch (parseErr) {
-            console.log("[MangaBall] Failed to parse JSON: " + parseErr.message);
-            return [];
-        }
-
-        console.log("[MangaBall] Parsed response code: " + json.code);
-
+        const json = await response.json();
         if (json.code === 200 && Array.isArray(json.data)) {
             for (const item of json.data) {
                 results.push({
@@ -82,18 +53,16 @@ async function searchResults(keyword, page = 1) {
             }
         }
 
-        console.log("[MangaBall] Final results count: " + results.length);
-        return results;
+        return JSON.stringify(results);
     } catch (err) {
-        console.log("[MangaBall] searchResults error: " + (err.message || err));
-        return [];
+        return JSON.stringify(results);
     }
 }
 
 async function extractDetails(url) {
     try {
         const response = await soraFetch(url);
-        if (!response) return { description: "Error", tags: [] };
+        if (!response) return JSON.stringify({ description: "Error", tags: [] });
         const html = await response.text();
 
         const descMatch = /<div class="description-text">[\s\S]*?<p>([\s\S]*?)<\/p>/.exec(html);
@@ -106,16 +75,16 @@ async function extractDetails(url) {
             tags.push(tagMatch[1].trim());
         }
 
-        return { description, tags };
+        return JSON.stringify({ description, tags });
     } catch (err) {
-        return { description: "Error", tags: [] };
+        return JSON.stringify({ description: "Error", tags: [] });
     }
 }
 
 async function extractChapters(url) {
     try {
         const titleId = extractTitleId(url);
-        if (!titleId) return { en: [] };
+        if (!titleId) return JSON.stringify({ en: [] });
 
         const csrfToken = await getCsrfToken();
         const postData = "title_id=" + titleId + "&userSettingsEnabled=false";
@@ -129,10 +98,10 @@ async function extractChapters(url) {
             body: postData
         });
 
-        if (!response) return { en: [] };
+        if (!response) return JSON.stringify({ en: [] });
         const json = await response.json();
         if (json.code !== 200 || !Array.isArray(json.ALL_CHAPTERS)) {
-            return { en: [] };
+            return JSON.stringify({ en: [] });
         }
 
         const results = [];
@@ -146,24 +115,24 @@ async function extractChapters(url) {
             results.push([String(chapter.number), entries]);
         }
 
-        return { en: results };
+        return JSON.stringify({ en: results });
     } catch (err) {
-        return { en: [] };
+        return JSON.stringify({ en: [] });
     }
 }
 
 async function extractImages(url) {
     try {
         const response = await soraFetch(url);
-        if (!response) return [];
+        if (!response) return JSON.stringify([]);
         const html = await response.text();
 
         const match = /const chapterImages = JSON\.parse\(`(\[.*?\])`\);/.exec(html);
-        if (!match) return [];
+        if (!match) return JSON.stringify([]);
 
         const images = JSON.parse(match[1]);
-        return images.map(img => img.trim());
+        return JSON.stringify(images.map(img => img.trim()));
     } catch (err) {
-        return [];
+        return JSON.stringify([]);
     }
 }
