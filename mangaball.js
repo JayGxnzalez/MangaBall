@@ -48,10 +48,10 @@ async function searchResults(keyword, page = 1) {
         }
 
         console.log("[MangaBall] Final results count: " + results.length);
-        return JSON.stringify(results);
+        return results;
     } catch (err) {
         console.log("[MangaBall] searchResults error: " + (err.message || err));
-        return JSON.stringify(results);
+        return results;
     }
 }
 
@@ -70,16 +70,16 @@ async function extractDetails(url) {
             tags.push(tagMatch[1].trim());
         }
 
-        return JSON.stringify({ description, tags });
+        return { description, tags };
     } catch (err) {
-        return JSON.stringify({ description: "Error", tags: [] });
+        return { description: "Error", tags: [] };
     }
 }
 
 async function extractChapters(url) {
     try {
         const titleId = extractTitleId(url);
-        if (!titleId) return JSON.stringify({ en: [] });
+        if (!titleId) return { en: [] };
 
         const csrfToken = await getCsrfToken();
         const postData = "title_id=" + titleId + "&userSettingsEnabled=false";
@@ -98,23 +98,25 @@ async function extractChapters(url) {
 
         const json = await response.json();
         if (json.code !== 200 || !Array.isArray(json.ALL_CHAPTERS)) {
-            return JSON.stringify({ en: [] });
+            return { en: [] };
         }
 
         const results = [];
         for (const chapter of json.ALL_CHAPTERS) {
-            const entries = chapter.translations.map(t => ({
-                id: t.url.trim(),
-                title: t.name || ("Chapter " + chapter.number),
-                chapter: parseFloat(chapter.number_float) || 0,
-                scanlation_group: t.group?.name || ""
-            }));
+            const entries = chapter.translations.map(function (t) {
+                return {
+                    id: t.url.trim(),
+                    title: t.name || ("Chapter " + chapter.number),
+                    chapter: parseFloat(chapter.number_float) || 0,
+                    scanlation_group: (t.group && t.group.name) ? t.group.name : ""
+                };
+            });
             results.push([String(chapter.number), entries]);
         }
 
-        return JSON.stringify({ en: results });
+        return { en: results };
     } catch (err) {
-        return JSON.stringify({ en: [] });
+        return { en: [] };
     }
 }
 
@@ -124,11 +126,11 @@ async function extractImages(url) {
         const html = await response.text();
 
         const match = /const chapterImages = JSON\.parse\(`(\[.*?\])`\);/.exec(html);
-        if (!match) return JSON.stringify([]);
+        if (!match) return [];
 
         const images = JSON.parse(match[1]);
-        return JSON.stringify(images.map(img => img.trim()));
+        return images.map(function (img) { return img.trim(); });
     } catch (err) {
-        return JSON.stringify([]);
+        return [];
     }
 }
