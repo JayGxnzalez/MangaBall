@@ -1,6 +1,6 @@
 {
   "sourceName": "MangaBall",
-  "iconURL": "https://www.google.com/s2/favicons?sz=128&domain=mangaball.net",
+  "iconURL": "https://raw.githubusercontent.com/JayGxnzalez/MangaBall/refs/heads/main/Icon.png",
   "version": "1.0.2",
   "language": "English",
   "scriptURL": "https://raw.githubusercontent.com/JayGxnzalez/MangaBall/refs/heads/main/mangaball.js",
