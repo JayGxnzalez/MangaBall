@@ -6,6 +6,11 @@ async function getCsrfToken() {
     return match[1];
 }
 
+function extractTitleId(url) {
+    const match = /([a-f0-9]{24})\/?$/.exec(url);
+    return match ? match[1] : null;
+}
+
 async function searchResults(keyword, page = 1) {
     const results = [];
     try {
@@ -25,23 +30,22 @@ async function searchResults(keyword, page = 1) {
         if (json.code === 200 && Array.isArray(json.data)) {
             for (const item of json.data) {
                 results.push({
-                    id: item.url.trim() + " | " + item._id,
+                    id: item.url.trim(),
                     imageURL: item.cover.trim(),
                     title: item.name.trim()
                 });
             }
         }
 
-        return JSON.stringify(results);
+        return results;
     } catch (err) {
-        return JSON.stringify([]);
+        return [];
     }
 }
 
 async function extractDetails(url) {
     try {
-        const [pageUrl] = url.split(" | ");
-        const response = await fetch(pageUrl);
+        const response = await fetch(url);
         const html = await response.text();
 
         const descMatch = /<div class="description-text">[\s\S]*?<p>([\s\S]*?)<\/p>/.exec(html);
@@ -54,19 +58,19 @@ async function extractDetails(url) {
             tags.push(tagMatch[1].trim());
         }
 
-        return JSON.stringify({ description, tags });
+        return { description, tags };
     } catch (err) {
-        return JSON.stringify({ description: "Error", tags: [] });
+        return { description: "Error", tags: [] };
     }
 }
 
 async function extractChapters(url) {
     try {
-        const [, titleId] = url.split(" | ");
-        if (!titleId) return JSON.stringify({ en: [] });
+        const titleId = extractTitleId(url);
+        if (!titleId) return { en: [] };
 
         const csrfToken = await getCsrfToken();
-        const postData = "title_id=" + titleId.trim() + "&userSettingsEnabled=false";
+        const postData = "title_id=" + titleId + "&userSettingsEnabled=false";
 
         const response = await fetch("https://mangaball.net/api/v1/chapter/chapter-listing-by-title-id/", {
             method: "POST",
@@ -79,7 +83,7 @@ async function extractChapters(url) {
 
         const json = await response.json();
         if (json.code !== 200 || !Array.isArray(json.ALL_CHAPTERS)) {
-            return JSON.stringify({ en: [] });
+            return { en: [] };
         }
 
         const results = [];
@@ -93,9 +97,9 @@ async function extractChapters(url) {
             results.push([String(chapter.number), entries]);
         }
 
-        return JSON.stringify({ en: results });
+        return { en: results };
     } catch (err) {
-        return JSON.stringify({ en: [] });
+        return { en: [] };
     }
 }
 
@@ -105,11 +109,11 @@ async function extractImages(url) {
         const html = await response.text();
 
         const match = /const chapterImages = JSON\.parse\(`(\[.*?\])`\);/.exec(html);
-        if (!match) return JSON.stringify([]);
+        if (!match) return [];
 
         const images = JSON.parse(match[1]);
-        return JSON.stringify(images.map(img => img.trim()));
+        return images.map(img => img.trim());
     } catch (err) {
-        return JSON.stringify([]);
+        return [];
     }
 }
