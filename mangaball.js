@@ -35,15 +35,19 @@ async function searchResults(keyword, page = 1) {
         console.log("[MangaBall] Response code: " + json.code);
 
         const manga = json.data && Array.isArray(json.data.manga) ? json.data.manga : [];
-        for (const item of manga) {
-            let url = item.url.trim();
+        for (let i = 0; i < manga.length; i++) {
+            const item = manga[i];
+            if (!item || !item.url || !item.title) continue;
+
+            let url = String(item.url).trim();
             if (url.indexOf("http") !== 0) {
                 url = "https://mangaball.net" + url;
             }
+
             results.push({
                 id: url,
-                imageURL: (item.img || "").trim(),
-                title: item.title.trim()
+                imageURL: String(item.img || "").trim(),
+                title: String(item.title).trim()
             });
         }
 
@@ -67,10 +71,10 @@ async function extractDetails(url) {
         const tagRegex = /data-tag-id="[^"]*"[^>]*>([^<]+)<\/span>/g;
         let tagMatch;
         while ((tagMatch = tagRegex.exec(html)) !== null) {
-            tags.push(tagMatch[1].trim());
+            tags.push(String(tagMatch[1]).trim());
         }
 
-        return { description, tags };
+        return { description: String(description), tags: tags };
     } catch (err) {
         return { description: "Error", tags: [] };
     }
@@ -102,16 +106,23 @@ async function extractChapters(url) {
         }
 
         const results = [];
-        for (const chapter of json.ALL_CHAPTERS) {
-            const entries = chapter.translations.map(function (t) {
-                return {
-                    id: t.url.trim(),
-                    title: t.name || ("Chapter " + chapter.number),
+        for (let i = 0; i < json.ALL_CHAPTERS.length; i++) {
+            const chapter = json.ALL_CHAPTERS[i];
+            const translations = Array.isArray(chapter.translations) ? chapter.translations : [];
+            const entries = [];
+            for (let j = 0; j < translations.length; j++) {
+                const t = translations[j];
+                if (!t || !t.url) continue;
+                entries.push({
+                    id: String(t.url).trim(),
+                    title: String(t.name || ("Chapter " + chapter.number)),
                     chapter: parseFloat(chapter.number_float) || 0,
-                    scanlation_group: (t.group && t.group.name) ? t.group.name : ""
-                };
-            });
-            results.push([String(chapter.number), entries]);
+                    scanlation_group: String((t.group && t.group.name) ? t.group.name : "")
+                });
+            }
+            if (entries.length > 0) {
+                results.push([String(chapter.number), entries]);
+            }
         }
 
         return { en: results };
@@ -129,7 +140,11 @@ async function extractImages(url) {
         if (!match) return [];
 
         const images = JSON.parse(match[1]);
-        return images.map(function (img) { return img.trim(); });
+        const out = [];
+        for (let i = 0; i < images.length; i++) {
+            if (images[i]) out.push(String(images[i]).trim());
+        }
+        return out;
     } catch (err) {
         return [];
     }
